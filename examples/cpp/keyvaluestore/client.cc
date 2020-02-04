@@ -23,7 +23,7 @@
 
 #include <grpcpp/grpcpp.h>
 
-#include "caching_interceptor.h"
+//#include "caching_interceptor.h"
 
 #ifdef BAZEL_BUILD
 #include "examples/protos/keyvaluestore.grpc.pb.h"
@@ -31,10 +31,12 @@
 #include "keyvaluestore.grpc.pb.h"
 #endif
 
+using ::google::protobuf::Empty;
 using grpc::Channel;
 using grpc::ClientContext;
 using grpc::Status;
 using keyvaluestore::KeyValueStore;
+using keyvaluestore::KVPair;
 using keyvaluestore::Request;
 using keyvaluestore::Response;
 
@@ -84,7 +86,26 @@ class KeyValueStoreClient {
     } else {
       std::cout << status.error_code() << ": " << status.error_message()
                 << std::endl;
-      std::cout << "RPC failed";
+      std::cout << "RPC failed" << std::endl;
+    }
+  }
+
+  void Set(const std::string& key, const std::string& value) {
+    // Context for the client. It could be used to convey extra information to
+    // the server and/or tweak certain RPC behaviors.
+    ClientContext context;
+    KVPair request;
+    request.set_key(key);
+    request.set_value(value);
+    Empty response;
+
+    Status status = stub_->Set(&context, request, &response);
+    if (status.ok()) {
+      std::cout << key << " inserted successfully.\n";
+    } else {
+      std::cout << status.error_code() << ": " << status.error_message()
+                << std::endl;
+      std::cout << "RPC failed" << std::endl;
     }
   }
 
@@ -99,6 +120,7 @@ int main(int argc, char** argv) {
   // (use of InsecureChannelCredentials()).
   // In this example, we are using a cache which has been added in as an
   // interceptor.
+  /*
   grpc::ChannelArguments args;
   std::vector<
       std::unique_ptr<grpc::experimental::ClientInterceptorFactoryInterface>>
@@ -109,10 +131,19 @@ int main(int argc, char** argv) {
       "localhost:50051", grpc::InsecureChannelCredentials(), args,
       std::move(interceptor_creators));
   KeyValueStoreClient client(channel);
+  */
+  KeyValueStoreClient client(grpc::CreateChannel(
+       "localhost:50051", grpc::InsecureChannelCredentials()));
   std::vector<std::string> keys = {"key1", "key2", "key3", "key4",
                                    "key5", "key1", "key2", "key4"};
   //client.GetValues(keys);
+  client.Set(keys[0], std::string("hello"));
   client.Get(keys[0]);
 
+  client.Set(keys[1], std::string("world"));
+  client.Get(keys[1]);
+
+  client.Set(keys[2], std::string("grpc"));
+  client.Get(keys[2]);
   return 0;
 }

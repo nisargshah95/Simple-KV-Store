@@ -107,4 +107,5 @@ foreach(_target client server)
   target_link_libraries(${_target}
     ${_GRPC_GRPCPP_UNSECURE}
     ${_PROTOBUF_LIBPROTOBUF})
+  target_compile_options(${_target} PUBLIC -g)
 endforeach()

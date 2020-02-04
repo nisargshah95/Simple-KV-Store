@@ -16,7 +16,9 @@
  *
  */
 
+#include <cstring>
 #include <iostream>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -29,18 +31,20 @@
 #include "keyvaluestore.grpc.pb.h"
 #endif
 
+using ::google::protobuf::Empty;
 using grpc::Server;
 using grpc::ServerBuilder;
 using grpc::ServerContext;
 using grpc::ServerReaderWriter;
 using grpc::Status;
 using keyvaluestore::KeyValueStore;
+using keyvaluestore::KVPair;
 using keyvaluestore::Request;
 using keyvaluestore::Response;
 
 struct kv_pair {
-  const char* key;
-  const char* value;
+  std::string key;
+  std::string value;
 };
 
 static const kv_pair kvs_map[] = {
@@ -48,13 +52,33 @@ static const kv_pair kvs_map[] = {
     {"key4", "value4"}, {"key5", "value5"},
 };
 
-const char* get_value_from_map(const char* key) {
-  for (size_t i = 0; i < sizeof(kvs_map) / sizeof(kv_pair); ++i) {
+// TODO: We can use a computed hash instead of string here
+// to improve lookup performance
+std::map<std::string, kv_pair> kv_store = {
+    {"key2", {"key2", "val2"}}
+};
+
+std::string get_value_from_map(const std::string& key) {
+  /*for (size_t i = 0; i < sizeof(kvs_map) / sizeof(kv_pair); ++i) {
     if (strcmp(key, kvs_map[i].key) == 0) {
       return kvs_map[i].value;
     }
+  }*/
+  auto it = kv_store.find(key);
+  if (it != kv_store.end()) {
+      std::cout << "[Server] Found key: " << key
+                << ", value: " << it->second.value << std::endl;
+      return it->second.value;
   }
-  return "";
+  std::cout << "[Server] Did not find key: " << key << std::endl;
+  return std::string("");
+}
+
+void set_value_in_map(const std::string& key, const std::string& value) {
+    // struct kv_pair kv = {key, value};
+    std::cout << "[Server] Setting key: " << key
+              << ", value: " << value << std::endl;
+    kv_store[key] = /*kv*/ {key, value};
 }
 
 // Logic and data behind the server's behavior.
@@ -64,7 +88,7 @@ class KeyValueStoreServiceImpl final : public KeyValueStore::Service {
     Request request;
     while (stream->Read(&request)) {
       Response response;
-      response.set_value(get_value_from_map(request.key().c_str()));
+      response.set_value(get_value_from_map(request.key()));
       stream->Write(response);
     }
     return Status::OK;
@@ -72,8 +96,17 @@ class KeyValueStoreServiceImpl final : public KeyValueStore::Service {
 
   Status Get(ServerContext* context, const Request* request,
              Response* response) override {
-    auto value = get_value_from_map(request->key().c_str());
+    std::cout << "[Server] Get" << std::endl;
+    auto value = get_value_from_map(request->key());
     response->set_value(value);
+    return Status::OK;
+  }
+
+  Status Set(ServerContext* context, const KVPair* kvPair,
+             Empty* response) override {
+
+    std::cout << "[Server] Set" << std::endl;
+    set_value_in_map(kvPair->key(), kvPair->value());
     return Status::OK;
   }
 };

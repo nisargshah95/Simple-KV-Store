@@ -16,11 +16,14 @@ syntax = "proto3";
 
 package keyvaluestore;
 
+import "google/protobuf/empty.proto";
+
 // A simple key-value storage service
 service KeyValueStore {
   // Provides a value for each key request
   rpc GetValues (stream Request) returns (stream Response) {}
   rpc Get (Request) returns (Response) {}
+  rpc Set (KVPair) returns (google.protobuf.Empty) {}
 }
 
 // The request message containing the key
@@ -31,4 +34,9 @@ message Request {
 // The response message containing the value associated with the key
 message Response {
   string value = 1;
+}
+
+message KVPair {
+  string key = 1;
+  string value = 2;
 }
