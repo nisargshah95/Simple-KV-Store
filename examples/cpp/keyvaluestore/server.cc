@@ -69,6 +69,13 @@ class KeyValueStoreServiceImpl final : public KeyValueStore::Service {
     }
     return Status::OK;
   }
+
+  Status Get(ServerContext* context, const Request* request,
+             Response* response) override {
+    auto value = get_value_from_map(request->key().c_str());
+    response->set_value(value);
+    return Status::OK;
+  }
 };
 
 void RunServer() {

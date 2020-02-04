@@ -20,6 +20,7 @@ package keyvaluestore;
 service KeyValueStore {
   // Provides a value for each key request
   rpc GetValues (stream Request) returns (stream Response) {}
+  rpc Get (Request) returns (Response) {}
 }
 
 // The request message containing the key

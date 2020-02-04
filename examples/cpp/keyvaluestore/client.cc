@@ -70,6 +70,24 @@ class KeyValueStoreClient {
     }
   }
 
+  void Get(const std::string& key) {
+    // Context for the client. It could be used to convey extra information to
+    // the server and/or tweak certain RPC behaviors.
+    ClientContext context;
+    Request request;
+    request.set_key(key);
+    Response response;
+
+    Status status = stub_->Get(&context, request, &response);
+    if (status.ok()) {
+      std::cout << key << " : " << response.value() << "\n";
+    } else {
+      std::cout << status.error_code() << ": " << status.error_message()
+                << std::endl;
+      std::cout << "RPC failed";
+    }
+  }
+
  private:
   std::unique_ptr<KeyValueStore::Stub> stub_;
 };
@@ -93,7 +111,8 @@ int main(int argc, char** argv) {
   KeyValueStoreClient client(channel);
   std::vector<std::string> keys = {"key1", "key2", "key3", "key4",
                                    "key5", "key1", "key2", "key4"};
-  client.GetValues(keys);
+  //client.GetValues(keys);
+  client.Get(keys[0]);
 
   return 0;
 }
