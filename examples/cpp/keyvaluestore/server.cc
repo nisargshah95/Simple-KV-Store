@@ -36,6 +36,7 @@ using grpc::Server;
 using grpc::ServerBuilder;
 using grpc::ServerContext;
 using grpc::ServerReaderWriter;
+using grpc::ServerWriter;
 using grpc::Status;
 using keyvaluestore::KeyValueStore;
 using keyvaluestore::KVPair;
@@ -109,6 +110,19 @@ class KeyValueStoreServiceImpl final : public KeyValueStore::Service {
     set_value_in_map(kvPair->key(), kvPair->value());
     return Status::OK;
   }
+
+  Status GetPrefix(ServerContext* context, const Request* request, ServerWriter<Response>* writer) override {
+    std::string prefixKey = request->key();	  
+    for(auto x : kv_store) {
+	Response response;
+	if(x.first.find(prefixKey) == 0) {
+	   response.set_value(x.second.value);
+	   writer->Write(response);
+	}
+    }
+    return Status::OK;
+  }
+
 };
 
 void RunServer() {

@@ -34,6 +34,7 @@
 using ::google::protobuf::Empty;
 using grpc::Channel;
 using grpc::ClientContext;
+using grpc::ClientReader;
 using grpc::Status;
 using keyvaluestore::KeyValueStore;
 using keyvaluestore::KVPair;
@@ -109,6 +110,29 @@ class KeyValueStoreClient {
     }
   }
 
+  void GetPrefix(const std::string& prefixKey) {
+    // Context for the client. It could be used to convey extra information to
+    // the server and/or tweak certain RPC behaviors.
+    ClientContext context;
+    Request request;
+    request.set_key(prefixKey);
+    std::unique_ptr<ClientReader<Response> > reader(
+    	stub_->GetPrefix(&context, request));
+    Response response;
+    while (reader->Read(&response)) {
+  	std::cout << response.value() <<"\n";
+    }
+    Status status = reader->Finish();
+    if (status.ok()) {
+      std::cout << prefixKey << ": Prefix Key. Got the list of all expected values successfully.\n";
+    } else {
+      std::cout << status.error_code() << ": " << status.error_message()
+                << std::endl;
+      std::cout << "RPC failed" << std::endl;
+    }
+  }
+ 
+
  private:
   std::unique_ptr<KeyValueStore::Stub> stub_;
 };
@@ -134,7 +158,7 @@ int main(int argc, char** argv) {
   */
   KeyValueStoreClient client(grpc::CreateChannel(
        "localhost:50051", grpc::InsecureChannelCredentials()));
-  std::vector<std::string> keys = {"key1", "key2", "key3", "key4",
+  std::vector<std::string> keys = {"key1", "skkey2", "key3", "key4",
                                    "key5", "key1", "key2", "key4"};
   //client.GetValues(keys);
   client.Set(keys[0], std::string("hello"));
@@ -145,5 +169,10 @@ int main(int argc, char** argv) {
 
   client.Set(keys[2], std::string("grpc"));
   client.Get(keys[2]);
+
+  client.Set(keys[3], std::string("world33"));
+  client.Get(keys[3]);
+
+  client.GetPrefix(std::string("key"));
   return 0;
 }

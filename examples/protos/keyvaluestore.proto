@@ -24,6 +24,8 @@ service KeyValueStore {
   rpc GetValues (stream Request) returns (stream Response) {}
   rpc Get (Request) returns (Response) {}
   rpc Set (KVPair) returns (google.protobuf.Empty) {}
+  rpc GetPrefix (Request) returns (stream Response) {}
+ 
 }
 
 // The request message containing the key
