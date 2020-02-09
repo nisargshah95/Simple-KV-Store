@@ -9,18 +9,52 @@ private:
 
 public:
     LogStorage(const std::string& fileName) {
+        //checkInit(fileName);
+
         outLog = std::shared_ptr<std::ofstream>(new std::ofstream (
-                    fileName, std::ofstream::out | std::ofstream::app));
+                    fileName,
+                    std::ofstream::out | std::ofstream::app | std::ofstream::binary));
         inLog = std::shared_ptr<std::ifstream>(new std::ifstream (
-                    fileName, std::ifstream::in));
+                    fileName, std::ifstream::in | std::ofstream::binary));
         assert(outLog->good());
         assert(inLog->good());
     }
-    // TODO: Possibly use char * for key value pairs for good IO performance?
+
+    /*
+     * On first run, reserve 2G space on disk for log file
+     */
+    /*
+    void checkInit(const std::string& fileName) {
+        std::ifstream f(fileName);
+        if (f.good()) return;
+
+        std::cout << "Running for the first time, initializing log..." << std::endl;
+        uint64_t max_size = 1;
+        max_size <<= 31; // 2G
+        char *max_buf = new char [max_size];
+        memset(max_buf, '\0', sizeof(char) * max_size);
+
+        std::ofstream of (fileName, std::ofstream::out | std::ofstream::binary);
+        of.write(max_buf, sizeof(char) * max_size);
+        of.flush();
+        std::cout << "Initialized log successfully" << std::endl;
+    }
+    */
+
     uint64_t write(const std::string& key, const std::string& value) {
-        outLog->write(key.data(), key.size());
+
+        // Write key size and value size
+        size_t key_size = key.size();
+        size_t value_size = value.size();
+        outLog->write((char *)(&key_size), sizeof(size_t));
+        outLog->write((char *)(&value_size), sizeof(size_t));
+
+        // write key and get starting offset for value
+        outLog->write(key.data(), key_size);
         uint64_t offset = (uint64_t) outLog->tellp();
-        outLog->write(value.data(), value.size());
+
+        // write value
+        outLog->write(value.data(), value_size);
         return offset;
     }
     /*
