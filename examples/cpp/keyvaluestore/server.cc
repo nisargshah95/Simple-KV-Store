@@ -31,6 +31,8 @@
 #include "keyvaluestore.grpc.pb.h"
 #endif
 
+#include "logstorage.h"
+
 using ::google::protobuf::Empty;
 using grpc::Server;
 using grpc::ServerBuilder;
@@ -42,6 +44,8 @@ using keyvaluestore::KeyValueStore;
 using keyvaluestore::KVPair;
 using keyvaluestore::Request;
 using keyvaluestore::Response;
+
+std::unique_ptr<LogStorage> log;
 
 struct kv_pair {
   std::string key;
@@ -76,7 +80,6 @@ std::string get_value_from_map(const std::string& key) {
 }
 
 void set_value_in_map(const std::string& key, const std::string& value) {
-    // struct kv_pair kv = {key, value};
     std::cout << "[Server] Setting key: " << key
               << ", value: " << value << std::endl;
     kv_store[key] = /*kv*/ {key, value};
@@ -105,8 +108,12 @@ class KeyValueStoreServiceImpl final : public KeyValueStore::Service {
 
   Status Set(ServerContext* context, const KVPair* kvPair,
              Empty* response) override {
-
     std::cout << "[Server] Set" << std::endl;
+
+    log->write(kvPair->key() , kvPair->value());
+    // Flush explicitly to ensure persistence
+    log->getOutStream()->flush();
+
     set_value_in_map(kvPair->key(), kvPair->value());
     return Status::OK;
   }
@@ -138,6 +145,9 @@ void RunServer() {
   // Finally assemble the server.
   std::unique_ptr<Server> server(builder.BuildAndStart());
   std::cout << "Server listening on " << server_address << std::endl;
+
+  //Initialize Log
+  log = std::unique_ptr<LogStorage>(new LogStorage("/tmp/log.txt"));
 
   // Wait for the server to shutdown. Note that some other thread must be
   // responsible for shutting down the server for this call to ever return.
