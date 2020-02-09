@@ -32,6 +32,7 @@
 #endif
 
 #include "logstorage.h"
+#include "common.h"
 
 using ::google::protobuf::Empty;
 using grpc::Server;
@@ -46,11 +47,6 @@ using keyvaluestore::Request;
 using keyvaluestore::Response;
 
 std::unique_ptr<LogStorage> log;
-
-struct kv_pair {
-  std::string key;
-  std::string value;
-};
 
 static const kv_pair kvs_map[] = {
     {"key1", "value1"}, {"key2", "value2"}, {"key3", "value3"},

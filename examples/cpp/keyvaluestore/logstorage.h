@@ -1,6 +1,11 @@
+#pragma once
+
 #include <cassert>
 #include <fstream>
 #include <memory>
+#include <map>
+
+#include "common.h"
 
 class LogStorage/*: public Persistence*/ {
 private:
@@ -44,19 +49,20 @@ public:
     uint64_t write(const std::string& key, const std::string& value) {
 
         // Write key size and value size
-        size_t key_size = key.size();
-        size_t value_size = value.size();
-        outLog->write((char *)(&key_size), sizeof(size_t));
-        outLog->write((char *)(&value_size), sizeof(size_t));
+        size_t keySize = key.size();
+        size_t valueSize = value.size();
+        outLog->write((char *)(&keySize), sizeof(size_t));
+        outLog->write((char *)(&valueSize), sizeof(size_t));
 
         // write key and get starting offset for value
-        outLog->write(key.data(), key_size);
+        outLog->write(key.data(), keySize);
         uint64_t offset = (uint64_t) outLog->tellp();
 
         // write value
-        outLog->write(value.data(), value_size);
+        outLog->write(value.data(), valueSize);
         return offset;
     }
+
     /*
     char * read(const std::string& key, const uint64_t& offset, const uint64_t& size) {
         char *buffer = new char [size];
@@ -64,8 +70,41 @@ public:
         inLog.read(buffer, size);
         return buffer;
     }
-    void readAll() {}
     */
+
+    /*
+     * Read all key-value pairs from disk
+     * Used to re-construct map in memory after crash
+     */
+    void readAll() {
+        std::cout << "[readAll]" << std::endl;
+        std::map<std::string, kv_pair> kvStore;
+
+        // Seek to beginning if not
+        inLog->seekg(0, inLog->beg);
+
+        while (!inLog->eof()) {
+            // Read key and value size
+            size_t keySize;
+            size_t valueSize;
+            inLog->read((char *)(&keySize), sizeof(size_t));
+            inLog->read((char *)(&valueSize), sizeof(size_t));
+            std::cout << "key size: " << keySize
+                      << ", value size: " << valueSize << std::endl;
+
+            char * key = new char[keySize];
+            char * value = new char[valueSize];
+
+            inLog->read(key, keySize);
+            inLog->read(value, valueSize);
+            std::cout << "key: " << key
+                      << ", value: " << value << std::endl;
+
+            // TODO: insert key-value in map
+            //kvStore = {
+        }
+    }
+
     std::shared_ptr<std::ofstream> getOutStream() {
         return outLog;
     }
