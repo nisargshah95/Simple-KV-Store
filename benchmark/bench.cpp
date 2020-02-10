@@ -13,12 +13,7 @@ constexpr auto maxThreads = 8;
 using bench_type1 = std::function<void(bool, int)>;
 vector<int64_t> latencies;
 
-// IMMER stuff
-using keyType = uint64_t;
-constexpr auto keySize = sizeof(keyType);
 constexpr auto valueSize = 1024;
-constexpr auto arraySize = 100000; 
-
 using valueType = std::array<char, valueSize>;
 
 // Global Definitions
@@ -137,45 +132,45 @@ void RunBenchmark (const ConfigOptions& options) {
 
     PopulateKeysAndOps(options, keys, writes);
 
-            // Cannot use valueType as value because hash function is not defined for it
-            // Convert value to string before insertion
-            bwtree_map = new BwTree<int, string>{true};
-            GenerateValue(value);
-            for (int i = 0; i < options.num_elems; i++) {
-                // cout << "Inserting " << i << endl;
-                // string value_str (value.begin(), value.end());
-                bool ok = bwtree_map->Insert(i, value.data());
-                if (!ok) {
-                    cerr << "[1] Error inserting key: " << i
-                        << " into bwtree" << endl;
-                }
+    // Cannot use valueType as value because hash function is not defined for it
+    // Convert value to string before insertion
+    bwtree_map = new BwTree<int, string>{true};
+    GenerateValue(value);
+    for (int i = 0; i < options.num_elems; i++) {
+        // cout << "Inserting " << i << endl;
+        // string value_str (value.begin(), value.end());
+        bool ok = bwtree_map->Insert(i, value.data());
+        if (!ok) {
+            cerr << "[1] Error inserting key: " << i
+                << " into bwtree" << endl;
+        }
+    }
+    benchOne = [&](bool write, int key) {
+        if (write) {
+            // We want to insert new keys.
+            // [0..num_elems] already in the map
+            // cout << "Inserting " << options.num_elems+key << endl;
+            // string value_str (value.begin(), value.end());
+            bool ok = bwtree_map->Insert(options.num_elems+key, value.data());
+            if (!ok) {
+                cerr << "[2] Error inserting key: " << options.num_elems+key
+                    << " into bwtree" << endl;
             }
-            benchOne = [&](bool write, int key) {
-                if (write) {
-                    // We want to insert new keys.
-                    // [0..num_elems] already in the map
-                    // cout << "Inserting " << options.num_elems+key << endl;
-                    // string value_str (value.begin(), value.end());
-                    bool ok = bwtree_map->Insert(options.num_elems+key, value.data());
-                    if (!ok) {
-                        cerr << "[2] Error inserting key: " << options.num_elems+key
-                            << " into bwtree" << endl;
-                    }
-                } else {
-                    // volatile const valueType* val;
-                    // cout << "Read " << key << endl;
-                    vector<string> values;
-                    values.reserve(1);
-                    bwtree_map->GetValue(key, values);
-                    if (values.empty()) {
-                        cerr << "[3] Error reading key: " << key << " from bwtree" << endl;
-                    }
-                    // assert((const valueType)(values[0]) == value);
-                }
-            };
-            // checker = [&]() {
-                // assert(immer_map->size() == options.num_ops);
-            // };
+        } else {
+            // volatile const valueType* val;
+            // cout << "Read " << key << endl;
+            vector<string> values;
+            values.reserve(1);
+            bwtree_map->GetValue(key, values);
+            if (values.empty()) {
+                cerr << "[3] Error reading key: " << key << " from bwtree" << endl;
+            }
+            // assert((const valueType)(values[0]) == value);
+        }
+    };
+    // checker = [&]() {
+        // assert(immer_map->size() == options.num_ops);
+    // };
 
     start = std::chrono::high_resolution_clock::now();
     for (int i=0; i < options.threads; i++) {
