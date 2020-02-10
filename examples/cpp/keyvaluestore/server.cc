@@ -139,8 +139,10 @@ void RunServer() {
   // clients. In this case, it corresponds to an *synchronous* service.
   builder.RegisterService(&service);
 
-  //Initialize Log
+  // Initialize Log and in-memory cache
+  // Do this before assembling server
   log = std::unique_ptr<LogStorage>(new LogStorage("/tmp/log.txt"));
+  log->readAll(kv_store);
 
   // Finally assemble the server.
   std::unique_ptr<Server> server(builder.BuildAndStart());

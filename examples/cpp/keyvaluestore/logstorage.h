@@ -76,32 +76,52 @@ public:
      * Read all key-value pairs from disk
      * Used to re-construct map in memory after crash
      */
-    void readAll() {
+    void readAll(std::map<std::string, kv_pair>& kvStore) {
         std::cout << "[readAll]" << std::endl;
-        std::map<std::string, kv_pair> kvStore;
 
-        // Seek to beginning if not
+        // Seek to beginning if not already there
         inLog->seekg(0, inLog->beg);
 
         while (!inLog->eof()) {
+
             // Read key and value size
-            size_t keySize;
-            size_t valueSize;
-            inLog->read((char *)(&keySize), sizeof(size_t));
-            inLog->read((char *)(&valueSize), sizeof(size_t));
+            size_t keySize = 0;
+            size_t valueSize = 0;
+
+            if (!(inLog->read((char *)(&keySize), sizeof(size_t)))) {
+                std::cerr << "Read key size failed!\n";
+                break;
+            }
+            if (!(inLog->read((char *)(&valueSize), sizeof(size_t)))) {
+                std::cerr << "Read key size failed!\n";
+                break;
+            }
+
             std::cout << "key size: " << keySize
                       << ", value size: " << valueSize << std::endl;
 
-            char * key = new char[keySize];
-            char * value = new char[valueSize];
+            // Now read key and value
+            char *key = new char[keySize+1];
+            char *value = new char[valueSize+1];
 
-            inLog->read(key, keySize);
-            inLog->read(value, valueSize);
+            if (!(inLog->read(key, keySize))) {
+                std::cerr << "Read key size failed!\n";
+                break;
+            }
+            key[keySize] = 0; // read does not add null character at the end
+            if (!(inLog->read(value, valueSize))) {
+                std::cerr << "Read key size failed!\n";
+                break;
+            }
+            value[valueSize] = 0;
+
             std::cout << "key: " << key
                       << ", value: " << value << std::endl;
 
-            // TODO: insert key-value in map
-            //kvStore = {
+            // TODO: convert char * -> string each time
+            // Is there a way to use char * everywhere?
+            std::string keyStr = std::string(key);
+            kvStore[keyStr] = {keyStr, std::string(value)};
         }
     }
 
