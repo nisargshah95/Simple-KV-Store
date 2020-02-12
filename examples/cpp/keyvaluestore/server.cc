@@ -22,7 +22,7 @@
 #include <memory>
 #include <string>
 #include <vector>
-
+#include <mutex>
 #include <grpcpp/grpcpp.h>
 
 #ifdef BAZEL_BUILD
@@ -33,6 +33,7 @@
 
 #include "logstorage.h"
 #include "common.h"
+#include "tbb/concurrent_hash_map.h"
 
 using ::google::protobuf::Empty;
 using grpc::Server;
@@ -55,9 +56,14 @@ static const kv_pair kvs_map[] = {
 
 // TODO: We can use a computed hash instead of string here
 // to improve lookup performance
-std::map<std::string, kv_pair> kv_store = {
+// typedef concurrent_hash_map<int,int> StringTable;
+typedef tbb::concurrent_hash_map<std::string, kv_pair> hashtable; 
+
+hashtable kv_store = {
     {"key2", {"key2", "val2"}}
 };
+
+std::mutex mtx;
 
 std::string get_value_from_map(const std::string& key) {
   /*for (size_t i = 0; i < sizeof(kvs_map) / sizeof(kv_pair); ++i) {
@@ -65,12 +71,14 @@ std::string get_value_from_map(const std::string& key) {
       return kvs_map[i].value;
     }
   }*/
-  auto it = kv_store.find(key);
-  if (it != kv_store.end()) {
+  hashtable::const_accessor a;
+  bool isPresent = kv_store.find(a, key);
+  if (isPresent) {
       std::cout << "[Server] Found key: " << key
-                << ", value: " << it->second.value << std::endl;
-      return it->second.value;
+                << ", value: " << a->second.value << std::endl;
+      return a->second.value;
   }
+  a.release();
   std::cout << "[Server] Did not find key: " << key << std::endl;
   return std::string("");
 }
@@ -78,11 +86,14 @@ std::string get_value_from_map(const std::string& key) {
 void set_value_in_map(const std::string& key, const std::string& value) {
     std::cout << "[Server] Setting key: " << key
               << ", value: " << value << std::endl;
-    kv_store[key] = /*kv*/ {key, value};
+    hashtable::accessor a;
+    kv_store.insert(a, key);
+    a->second = /*kv*/ {key, value};
+    a.release();
 }
 
 // Logic and data behind the server's behavior.
-class KeyValueStoreServiceImpl final : public KeyValueStore::Service {
+class KeyValueStoreServiceImpl final : public KeyValueStore::Service{
   Status GetValues(ServerContext* context,
                    ServerReaderWriter<Response, Request>* stream) override {
     Request request;
@@ -104,6 +115,7 @@ class KeyValueStoreServiceImpl final : public KeyValueStore::Service {
 
   Status Set(ServerContext* context, const KVPair* kvPair,
              Empty* response) override {
+    mtx.lock();
     std::cout << "[Server] Set" << std::endl;
 
     log->write(kvPair->key() , kvPair->value());
@@ -111,18 +123,19 @@ class KeyValueStoreServiceImpl final : public KeyValueStore::Service {
     log->getOutStream()->flush();
 
     set_value_in_map(kvPair->key(), kvPair->value());
+    mtx.unlock();
     return Status::OK;
   }
 
   Status GetPrefix(ServerContext* context, const Request* request, ServerWriter<Response>* writer) override {
-    std::string prefixKey = request->key();	  
-    for(auto x : kv_store) {
-	Response response;
-	if(x.first.find(prefixKey) == 0) {
-	   response.set_value(x.second.value);
-	   writer->Write(response);
-	}
-    }
+    std::string prefixKey = request->key();	 
+    for(hashtable::iterator it = kv_store.begin(); it != kv_store.end(); it++) {
+      Response response;
+      if(it->first.find(prefixKey) == 0) {
+         response.set_value(it->second.value);
+         writer->Write(response);
+      }
+    } 
     return Status::OK;
   }
 

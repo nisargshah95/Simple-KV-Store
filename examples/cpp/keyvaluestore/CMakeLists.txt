@@ -86,6 +86,7 @@ set(hw_proto_srcs "${CMAKE_CURRENT_BINARY_DIR}/keyvaluestore.pb.cc")
 set(hw_proto_hdrs "${CMAKE_CURRENT_BINARY_DIR}/keyvaluestore.pb.h")
 set(hw_grpc_srcs "${CMAKE_CURRENT_BINARY_DIR}/keyvaluestore.grpc.pb.cc")
 set(hw_grpc_hdrs "${CMAKE_CURRENT_BINARY_DIR}/keyvaluestore.grpc.pb.h")
+set(lib_linker "~/tbb/build/linux_intel64_gcc_cc7.4.0_libc2.27_kernel4.15.0_release/libtbb.so.2")
 add_custom_command(
       OUTPUT "${hw_proto_srcs}" "${hw_proto_hdrs}" "${hw_grpc_srcs}" "${hw_grpc_hdrs}"
       COMMAND ${_PROTOBUF_PROTOC}
@@ -106,6 +107,9 @@ foreach(_target client server)
     ${hw_grpc_srcs})
   target_link_libraries(${_target}
     ${_GRPC_GRPCPP_UNSECURE}
-    ${_PROTOBUF_LIBPROTOBUF})
+    ${_PROTOBUF_LIBPROTOBUF}
+    ${lib_linker}
+    )
   target_compile_options(${_target} PUBLIC -g)
+  target_include_directories(${_target} PUBLIC ~/tbb/include)
 endforeach()

@@ -6,6 +6,7 @@
 #include <map>
 
 #include "common.h"
+#include "tbb/concurrent_hash_map.h"
 
 class LogStorage/*: public Persistence*/ {
 private:
@@ -76,7 +77,7 @@ public:
      * Read all key-value pairs from disk
      * Used to re-construct map in memory after crash
      */
-    void readAll(std::map<std::string, kv_pair>& kvStore) {
+    void readAll(tbb::concurrent_hash_map<std::string, kv_pair>& kvStore) {
         std::cout << "[readAll]" << std::endl;
 
         // Seek to beginning if not already there
@@ -121,7 +122,10 @@ public:
             // TODO: convert char * -> string each time
             // Is there a way to use char * everywhere?
             std::string keyStr = std::string(key);
-            kvStore[keyStr] = {keyStr, std::string(value)};
+            tbb::concurrent_hash_map<std::string, kv_pair>::accessor a;
+            kvStore.insert(a, keyStr);
+            a->second = {keyStr, std::string(value)};
+            a.release();
         }
     }
 
