@@ -22,7 +22,7 @@ cmake_minimum_required(VERSION 3.5.1)
 project(KeyValueStore C CXX)
 
 if(NOT MSVC)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
 else()
   add_definitions(-D_WIN32_WINNT=0x600)
 endif()
@@ -109,6 +109,7 @@ foreach(_target client server)
     ${_GRPC_GRPCPP_UNSECURE}
     ${_PROTOBUF_LIBPROTOBUF}
     ${lib_linker}
+    stdc++fs
     )
   target_compile_options(${_target} PUBLIC -g)
   target_include_directories(${_target} PUBLIC ~/tbb/include)
