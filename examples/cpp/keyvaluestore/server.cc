@@ -16,6 +16,7 @@
  *
  */
 
+#include <chrono>
 #include <cstring>
 #include <iostream>
 #include <map>
@@ -47,12 +48,11 @@ using keyvaluestore::KVPair;
 using keyvaluestore::Request;
 using keyvaluestore::Response;
 
-std::unique_ptr<LogStorage> log;
+typedef std::chrono::high_resolution_clock hrc;
 
-static const kv_pair kvs_map[] = {
-    {"key1", "value1"}, {"key2", "value2"}, {"key3", "value3"},
-    {"key4", "value4"}, {"key5", "value5"},
-};
+hrc::time_point start, stop;
+
+std::unique_ptr<LogStorage> log;
 
 // TODO: We can use a computed hash instead of string here
 // to improve lookup performance
@@ -60,17 +60,12 @@ static const kv_pair kvs_map[] = {
 typedef tbb::concurrent_hash_map<std::string, kv_pair> hashtable; 
 
 hashtable kv_store = {
-    {"key2", {"key2", "val2"}}
+    {}
 };
 
 std::mutex mtx;
 
 std::string get_value_from_map(const std::string& key) {
-  /*for (size_t i = 0; i < sizeof(kvs_map) / sizeof(kv_pair); ++i) {
-    if (strcmp(key, kvs_map[i].key) == 0) {
-      return kvs_map[i].value;
-    }
-  }*/
   hashtable::const_accessor a;
   bool isPresent = kv_store.find(a, key);
   if (isPresent) {
@@ -79,7 +74,7 @@ std::string get_value_from_map(const std::string& key) {
       return a->second.value;
   }
   a.release();
-  std::cout << "[Server] Did not find key: " << key << std::endl;
+  // std::cout << "[Server] Did not find key: " << key << std::endl;
   return std::string("");
 }
 
@@ -107,7 +102,7 @@ class KeyValueStoreServiceImpl final : public KeyValueStore::Service{
 
   Status Get(ServerContext* context, const Request* request,
              Response* response) override {
-    std::cout << "[Server] Get" << std::endl;
+    // std::cout << "[Server] Get" << std::endl;
     auto value = get_value_from_map(request->key());
     response->set_value(value);
     return Status::OK;
@@ -116,7 +111,7 @@ class KeyValueStoreServiceImpl final : public KeyValueStore::Service{
   Status Set(ServerContext* context, const KVPair* kvPair,
              Empty* response) override {
     mtx.lock();
-    std::cout << "[Server] Set" << std::endl;
+    // std::cout << "[Server] Set" << std::endl;
 
     log->write(kvPair->key() , kvPair->value());
     // Flush explicitly to ensure persistence
@@ -159,6 +154,10 @@ void RunServer() {
 
   // Finally assemble the server.
   std::unique_ptr<Server> server(builder.BuildAndStart());
+  stop = hrc::now();
+
+  std::cout << "Startup time: " << std::chrono::duration<double, std::milli>(
+            stop-start).count() << " ms" << std::endl;
   std::cout << "Server listening on " << server_address << std::endl;
 
   // Wait for the server to shutdown. Note that some other thread must be
@@ -167,6 +166,7 @@ void RunServer() {
 }
 
 int main(int argc, char** argv) {
+  start = hrc::now();
   RunServer();
 
   return 0;

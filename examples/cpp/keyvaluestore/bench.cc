@@ -2,26 +2,29 @@
 #include <thread> 
 #include <random>
 #include <cassert>
-#include <climits>
-#include <cstdio> // remove (file)
+#include <cstdlib>     /* srand, rand */
+#include <fstream>
+#include <time.h>       /* time */
 #include <memory>
 #include <unistd.h> // getopt
+#include <vector>
 
 #include "client.h"
 
 using namespace std;
 
 
-// Global Definitions
-//
-// Datastructures defined here to ensure they stay in scope for the benchmark lambda
 unique_ptr<KeyValueStoreClient> client;
-vector<int64_t> r_latencies;
-vector<int64_t> w_latencies;
+unique_ptr<ofstream[]> results;
 
 string *keys;
 string *values;
 char *writes;
+int *updates;
+
+// thread local read and write latencies
+thread_local vector<int64_t> r_latencies;
+thread_local vector<int64_t> w_latencies;
 
 struct ConfigOptions {
     int threads = 1;
@@ -30,15 +33,16 @@ struct ConfigOptions {
     int num_elems = 0;
     int percent_writes = 0;
     int value_size = 512;
+    int load = 1;
     bool Validate () {
-        return ((threads >0) && (num_ops > 0)
-             && (num_elems > 0));
+        return ((threads >0) && (num_ops >= 0)
+             && (num_elems >= 0));
     }
 };
 
 void PrintUsage () {
-    cerr << "Usage: ./bench"
-         << " -e num_elems -n num_ops -t threads[=1] -v val_size[=512] -w pc_writes[=0]\n" << endl;
+    cerr << "Usage: ./bench -e num_elems -n num_ops [-t threads=1] "
+        << "[-v val_size=512] [-w %_writes=0] [-l load_data=1]\n" << endl;
 }
 
 void GenerateValue(string& value, int size) {
@@ -50,34 +54,43 @@ void GenerateValue(string& value, int size) {
 
 void GeneratePaddedStr(string& s, int i, int padding) {
     string i_str = to_string(i);
-    s.append(padding-i_str.size(), 'K');
+    s.append(padding-i_str.size(), '0');
     s.append(i_str.data(), i_str.size());
-    cout << "generated str: " << s << endl;
+    // cout << "generated str: " << s << endl;
 }
 
-void PopulateKeysAndValuesAndOps(const ConfigOptions& options, string *keys,
-        string *values, char *writes) {
+void PopulateKeysAndValuesAndOps(const ConfigOptions& options) {
 
     std::random_device device;
     int random_seed = device();
     std::mt19937 generator(random_seed);
 
-    for (int i = 0; i < options.num_elems; i++) {
+    for (int i = 0; i < options.num_elems + options.num_ops; i++) {
         GeneratePaddedStr(keys[i], i, 128);
         GeneratePaddedStr(values[i], i, options.value_size);
     }
 
+    srand (time(NULL));
     // Populate ops with reads/writes as per write_percent.
     std::uniform_int_distribution<int> percent_distribution(1, 100);
     for (int i = 0; i < options.num_ops; i++) {
-        if (percent_distribution(generator) <= options.percent_writes)
-            writes[i] = 'w';
+        if (percent_distribution(generator) <= options.percent_writes) {
+            if (rand() % 100 < 50)
+                writes[i] = 'w'; // writes
+            else
+                writes[i] = 'u'; // updates
+        }
         else 
             writes[i] = 'r';
     }
 
+    srand (time(NULL));
+    for (int i = 0; i < options.num_ops; i++) {
+        updates[i] = rand() % options.num_elems;
+    }
+
     // Debugging feature
-    if (options.num_ops < 100) {
+    if (options.num_ops < 100 && options.num_ops > 0) {
         cout << "Keys:" << endl;
         for (int i = 0; i < options.num_ops; i++) {
             cout << keys[i] << " ";
@@ -92,104 +105,134 @@ void PopulateKeysAndValuesAndOps(const ConfigOptions& options, string *keys,
 }
 
 void bench(char write, string key, const string& value, int num_elems) {
-    if (write == 'w' || write == 'u') {
-        // We want to insert new keys.
-        // [0..num_elems] already in the map
-        // cout << "Inserting " << options.num_elems+key << endl;
-        key = key.append(to_string(num_elems));
-        if (!client->Set(key, value)) {
-            cerr << "Client set failed for key: " << key << endl;
-        }
-    } else {
+    if (write == 'r') {
         // cout << "Read " << key << endl;
         string resp = client->Get(key);
         if (resp.empty()) {
             cerr << "Error reading key: " << key << endl;
         }
         // assert((const valueType)(values[0]) == value);
+    } else {
+        // We want to insert new keys.
+        // [0..num_elems] already in the map
+        // cout << "Inserting " << options.num_elems+key << endl;
+        if (!client->Set(key, value)) {
+            cerr << "Client set failed for key: " << key << endl;
+        }
     }
 };
 
-void ThreadWork(int thread_id, int ops_per_thread, int num_elems) {
+void computeLatency(int thread_id, vector<int64_t>& latencies) {
+    if (latencies.empty()) return;
+    //cout << "Sorting latencies..." << endl;
+    sort(latencies.begin(), latencies.end());
+    results[thread_id] << "99th percentile latency: "
+        << latencies[99*latencies.size()/100] << " us" << endl;
+
+    if (latencies.size() % 2 == 0)
+        results[thread_id] << "Median latency: " << (latencies[latencies.size()/2-1]
+                                     + latencies[latencies.size()/2])/2 << " us" << endl;
+    else
+        results[thread_id] << "Median latency: " << latencies[latencies.size()/2] << " us" << endl;
+}
+
+void ThreadWork(int thread_id, const ConfigOptions& options) {
+    results[thread_id] = ofstream(string("results").append(to_string(thread_id)));
+    assert(results[thread_id].good());
+
+    int num_elems = options.num_elems, num_ops = options.num_ops,
+        ops_per_thread = options.ops_per_thread;
+    r_latencies.reserve(num_elems + num_ops);
+    w_latencies.reserve(num_elems + num_ops);
+
+    // start clock for measuting throughput
+    auto start = std::chrono::high_resolution_clock::now();
 
     uint64_t thread_offset = thread_id*ops_per_thread;
     for (uint64_t i = 0; i < ops_per_thread; i++) {
         auto offset = thread_offset+i;
-        auto key = keys[offset];
-        auto value = values[offset];
         auto write = writes[offset];
+        string key, value;
+
+        if (write == 'r') {
+            key = keys[offset % num_elems];
+            value = values[offset];
+        }
+        else if (write == 'u') {
+            key = keys[updates[offset]];
+            value = values[updates[offset]];
+        }
+        else if (write == 'w') {
+            key = keys[num_elems + offset];
+            value = values[num_elems + offset];
+        }
 
         std::chrono::time_point<std::chrono::high_resolution_clock> start, stop;
+        // start clock for measuting latency
         start = std::chrono::high_resolution_clock::now();
         bench(write, key, value, num_elems);
+        // stop clock for measuting latency
         stop = std::chrono::high_resolution_clock::now();
 
-        auto latency = std::chrono::duration_cast<std::chrono::nanoseconds>
+        auto latency = std::chrono::duration_cast<std::chrono::microseconds>
             (stop-start).count();
-        if (write) {
-            w_latencies.push_back(latency);
-        } else {
+        if (write == 'r') {
             r_latencies.push_back(latency);
+        } else {
+            w_latencies.push_back(latency);
         }
     }
-}
 
-void computeLatency(vector<int64_t>& latencies) {
-    cout << "Sorting latencies..." << endl;
-    sort(latencies.begin(), latencies.end());
-    cout << "99th percentile latency: " << latencies[99*latencies.size()/100] << endl;
-    if (latencies.size() % 2 == 0)
-        cout << "Median latency: " << (latencies[latencies.size()/2-1]
-                                     + latencies[latencies.size()/2])/2 << endl;
-    else
-        cout << "Median latency: " << latencies[latencies.size()/2] << endl;
+    // stop clock for measuting throughput
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto latency = std::chrono::duration_cast<std::chrono::nanoseconds>
+        (stop-start).count();
+    //cout << "Latency: " << latency << " ns\n";
+    results[thread_id] << "Throughput: " << (options.num_ops*1E9/latency) << " op/s\n";
+
+    results[thread_id] << "Read latency: " << endl;
+    computeLatency(thread_id, r_latencies);
+    results[thread_id] << "Write latency: " << endl;
+    computeLatency(thread_id, w_latencies);
 }
 
 void RunBenchmark (const ConfigOptions& options) {
 
     std::thread workers[options.threads];
-    std::chrono::time_point<std::chrono::high_resolution_clock> start, stop;
-    keys = new string [options.num_elems]; // was num_ops
-    values = new string [options.num_elems]; // was num_ops
+    keys = new string [options.num_elems + options.num_ops]; // was num_ops
+    values = new string [options.num_elems + options.num_ops]; // was num_ops
     writes = new char [options.num_ops];
-    r_latencies.reserve(options.num_elems + options.num_ops);
-    w_latencies.reserve(options.num_elems + options.num_ops);
+    updates = new int [options.num_ops];
+    results = unique_ptr<ofstream[]>(new ofstream[options.threads]);
 
-    PopulateKeysAndValuesAndOps(options, keys, values, writes);
+    PopulateKeysAndValuesAndOps(options);
 
     // initialize kv store
     //GenerateValue(value, options.value_size);
-    for (int i = 0; i < options.num_elems; i++) {
-        // cout << "Inserting " << i << endl;
-        // string value_str (value.begin(), value.end());
-        if(!client->Set(keys[i], values[i])) {
-            cerr << "Client set failed for key: " << keys[i] << endl;
+    if (options.load) {
+        for (int i = 0; i < options.num_elems; i++) {
+            // cout << "Inserting " << i << endl;
+            // string value_str (value.begin(), value.end());
+            if(!client->Set(keys[i], values[i])) {
+                cerr << "Client set failed for key: " << keys[i] << endl;
+            }
         }
     }
 
-    start = std::chrono::high_resolution_clock::now();
+    // Don't run benchmark if we're only loading data
+    if (options.num_ops == 0) return;
+
     for (int i=0; i < options.threads; i++) {
-        workers[i] = std::thread(ThreadWork, i, options.ops_per_thread, options.num_elems);
+        workers[i] = std::thread(ThreadWork, i, options);
     }
     for (int i=0; i < options.threads; i++) {
         workers[i].join();
     }
-    stop = std::chrono::high_resolution_clock::now();
-
-    auto latency = std::chrono::duration_cast<std::chrono::nanoseconds>
-        (stop-start).count();
-    //cout << "Latency: " << latency << " ns\n";
-    cout << "Throughput: " << (options.num_ops*1E9/latency) << " op/s\n";
-
-    cout << "Read latency: " << endl;
-    computeLatency(r_latencies);
-    cout << "Write latency: " << endl;
-    computeLatency(w_latencies);
 }
 
 bool GetInputArgs(int argc, char **argv, ConfigOptions& options) {
     int opt;
-    while ((opt = getopt(argc, argv, "e:n:t:v:w:")) != -1) {
+    while ((opt = getopt(argc, argv, "e:n:t:v:w:l:")) != -1) {
         switch (opt) {
             case 'e':
                 options.num_elems = atol(optarg);
@@ -205,6 +248,9 @@ bool GetInputArgs(int argc, char **argv, ConfigOptions& options) {
                 break;
             case 'w':
                 options.percent_writes = atoi(optarg);
+                break;
+            case 'l':
+                options.load = atoi(optarg);
                 break;
             default:
                 PrintUsage();
@@ -253,4 +299,3 @@ int main (int argc, char **argv)
 
     return 0;
 }
-
