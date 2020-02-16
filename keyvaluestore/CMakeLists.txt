@@ -17,6 +17,9 @@
 # See cmake_externalproject/CMakeLists.txt for all-in-one cmake build
 # that automatically builds all the dependencies before building helloworld.
 
+SET(CMAKE_C_COMPILER gcc-7)
+SET(CMAKE_CXX_COMPILER g++-7)
+
 cmake_minimum_required(VERSION 3.10)
 
 project(KeyValueStore C CXX)

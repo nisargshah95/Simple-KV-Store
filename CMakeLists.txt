@@ -20,6 +20,9 @@
 # including the "helloworld" project itself.
 # See https://blog.kitware.com/cmake-superbuilds-git-submodules/
 
+SET(CMAKE_C_COMPILER gcc-7)
+SET(CMAKE_CXX_COMPILER g++-7)
+
 cmake_minimum_required(VERSION 3.10)
 
 # Project
