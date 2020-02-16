@@ -95,7 +95,9 @@ class KeyValueStoreServiceImpl final : public KeyValueStore::Service{
     mtx.lock();
     // std::cout << "[Server] Set" << std::endl;
 
-    log->write(kvPair->key() , kvPair->value());
+    if (log->write(kvPair->key() , kvPair->value()) == -1) {
+        return Status::CANCELLED;
+    }
     // Flush explicitly to ensure persistence
     log->getOutStream()->flush();
 

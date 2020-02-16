@@ -34,15 +34,28 @@ public:
         // Write key size and value size
         size_t keySize = key.size();
         size_t valueSize = value.size();
-        outLog->write((char *)(&keySize), sizeof(size_t));
-        outLog->write((char *)(&valueSize), sizeof(size_t));
+        
+        if (!(outLog->write((char *)(&keySize), sizeof(size_t)))) {
+            std::cerr << "Write key size failed!\n";
+            return -1;
+        }
+        if (!(outLog->write((char *)(&valueSize), sizeof(size_t)))) {
+            std::cerr << "Write value size failed!\n";
+            return -1;
+        }
 
         // write key and get starting offset for value
-        outLog->write(key.data(), keySize);
+        if (!(outLog->write(key.data(), keySize))) {
+            std::cerr << "Write key failed!\n";
+            return -1;
+        }
         uint64_t offset = (uint64_t) outLog->tellp();
 
         // write value
-        outLog->write(value.data(), valueSize);
+        if (!(outLog->write(value.data(), valueSize))) {
+            std::cerr << "Write value failed!\n";
+            return -1;
+        }
         return offset;
     }
 

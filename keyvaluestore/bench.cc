@@ -22,7 +22,7 @@ string *values;
 char *writes;
 int *updates;
 
-// thread local read and write latencies
+// per-thread read and write latencies
 vector< vector<uint64_t> >r_latencies;
 vector< vector<uint64_t> >w_latencies;
 vector<double> throughputs;
