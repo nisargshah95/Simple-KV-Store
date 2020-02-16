@@ -15,7 +15,7 @@ using namespace std;
 
 
 unique_ptr<KeyValueStoreClient> client;
-unique_ptr<ofstream[]> results;
+ofstream results ("results.txt");
 
 string *keys;
 string *values;
@@ -23,8 +23,9 @@ char *writes;
 int *updates;
 
 // thread local read and write latencies
-thread_local vector<uint64_t> r_latencies;
-thread_local vector<uint64_t> w_latencies;
+vector< vector<uint64_t> >r_latencies;
+vector< vector<uint64_t> >w_latencies;
+vector<double> throughputs;
 
 struct ConfigOptions {
     int threads = 1;
@@ -42,7 +43,7 @@ struct ConfigOptions {
 
 void PrintUsage () {
     cerr << "Usage: ./bench -e num_elems -n num_ops [-t threads=1] "
-        << "[-v val_size=512] [-w %_writes=0] [-l load_data=1]\n" << endl;
+        << "[-v val_size=512] [-w %_writes=0] [-l load_data=1]" << endl;
 }
 
 void GenerateValue(string& value, int size) {
@@ -123,35 +124,52 @@ void bench(char write, string key, const string& value, int num_elems) {
     }
 };
 
-void computeLatency(int thread_id, vector<uint64_t>& latencies) {
-    if (latencies.empty()) return;
+void computeLatency(/*int thread_id,*/ const vector< vector<uint64_t> >& latencies) {
+    
     //cout << "Sorting latencies..." << endl;
-    sort(latencies.begin(), latencies.end());
-    results[thread_id] << "99th percentile latency: "
-        << latencies[99*latencies.size()/100] << " us\n";
+    // sort(latencies.begin(), latencies.end());
+    // results[thread_id] << "99th percentile latency: "
+    //     << latencies[99*latencies.size()/100] << " us\n";
 
-    if (latencies.size() % 2 == 0)
-        results[thread_id] << "Median latency: " << (latencies[latencies.size()/2-1]
-                                     + latencies[latencies.size()/2])/2 << " us\n";
-    else
-        results[thread_id] << "Median latency: " << latencies[latencies.size()/2] << " us\n";
+    // if (latencies.size() % 2 == 0)
+    //     results[thread_id] << "Median latency: " << (latencies[latencies.size()/2-1]
+    //                                  + latencies[latencies.size()/2])/2 << " us\n";
+    // else
+    //     results[thread_id] << "Median latency: " << latencies[latencies.size()/2] << " us\n";
 
-    uint64_t avg = 0;
-    for (auto n : latencies) {
-        avg += n;
+    double avg = 0;
+    uint64_t size = 0;
+    for (auto lat : latencies) {
+        if (lat.empty()) continue;
+        for (auto n : lat) {
+            avg += n;
+        }
+        size += lat.size();
     }
-    avg /= latencies.size();
-    results[thread_id] << "Average latency: " << avg << " us\n";
+    
+    avg /= size;
+    // results[thread_id] << "Average latency: " << avg << " us\n";
+    cout << "Average latency: " << avg << " us" << endl;
+}
+
+void computeThroughput(const vector<double>& throughputs) {
+    double avg = 0;
+    for (auto t : throughputs) {
+        avg += t;
+    }
+    avg /= throughputs.size();
+    cout << "Average throughput: " << avg << " ops/s" << endl;
 }
 
 void ThreadWork(int thread_id, const ConfigOptions& options) {
-    results[thread_id] = ofstream(string("results").append(to_string(thread_id)));
-    assert(results[thread_id].good());
+    // results[thread_id] = ofstream(string("results").append(to_string(thread_id)));
+    // assert(results[thread_id].good());
 
     int num_elems = options.num_elems, num_ops = options.num_ops,
         ops_per_thread = options.ops_per_thread;
-    r_latencies.reserve(num_elems + num_ops);
-    w_latencies.reserve(num_elems + num_ops);
+
+    r_latencies[thread_id].reserve(num_elems + num_ops);
+    w_latencies[thread_id].reserve(num_elems + num_ops);
     srand (time(NULL));
 
     // start clock for measuting throughput
@@ -183,9 +201,9 @@ void ThreadWork(int thread_id, const ConfigOptions& options) {
         auto latency = std::chrono::duration_cast<std::chrono::microseconds>
             (stop-start).count();
         if (write == 'r') {
-            r_latencies.push_back(latency);
+            r_latencies[thread_id].push_back(latency);
         } else {
-            w_latencies.push_back(latency);
+            w_latencies[thread_id].push_back(latency);
         }
     }
 
@@ -194,12 +212,8 @@ void ThreadWork(int thread_id, const ConfigOptions& options) {
     auto latency = std::chrono::duration_cast<std::chrono::nanoseconds>
         (stop-start).count();
     //cout << "Latency: " << latency << " ns\n";
-    results[thread_id] << "Throughput: " << (options.num_ops*1E9/latency) << " op/s\n";
-
-    results[thread_id] << "Read latency: " << endl;
-    computeLatency(thread_id, r_latencies);
-    results[thread_id] << "Write latency: " << endl;
-    computeLatency(thread_id, w_latencies);
+    // results[thread_id] << "Throughput: " << (options.num_ops*1E9/latency) << " op/s\n";
+    throughputs[thread_id] = options.num_ops*1E9/latency;
 }
 
 void RunBenchmark (const ConfigOptions& options) {
@@ -209,7 +223,10 @@ void RunBenchmark (const ConfigOptions& options) {
     values = new string [options.num_elems + options.num_ops]; // was num_ops
     writes = new char [options.num_ops];
     updates = new int [options.num_ops];
-    results = unique_ptr<ofstream[]>(new ofstream[options.threads]);
+    // results = unique_ptr<ofstream>(new ofstream);
+    r_latencies.resize(options.threads);
+    w_latencies.resize(options.threads);
+    throughputs.resize(options.threads);
 
     PopulateKeysAndValuesAndOps(options);
 
@@ -234,6 +251,15 @@ void RunBenchmark (const ConfigOptions& options) {
     for (int i=0; i < options.threads; i++) {
         workers[i].join();
     }
+
+    // results[thread_id] << "Read latency: " << endl;
+    cout << "Read latency: " << endl;
+    computeLatency(/*thread_id,*/ r_latencies);
+    // results[thread_id] << "Write latency: " << endl;
+    cout << "Write latency: " << endl;
+    computeLatency(/*thread_id,*/ w_latencies);
+    cout << "Throughput: " << endl;
+    computeThroughput(throughputs);
 }
 
 bool GetInputArgs(int argc, char **argv, ConfigOptions& options) {
