@@ -23,8 +23,8 @@ char *writes;
 int *updates;
 
 // thread local read and write latencies
-thread_local vector<int64_t> r_latencies;
-thread_local vector<int64_t> w_latencies;
+thread_local vector<uint64_t> r_latencies;
+thread_local vector<uint64_t> w_latencies;
 
 struct ConfigOptions {
     int threads = 1;
@@ -84,6 +84,7 @@ void PopulateKeysAndValuesAndOps(const ConfigOptions& options) {
             writes[i] = 'r';
     }
 
+    // indices to keys that will be updated
     srand (time(NULL));
     for (int i = 0; i < options.num_ops; i++) {
         updates[i] = rand() % options.num_elems;
@@ -122,18 +123,25 @@ void bench(char write, string key, const string& value, int num_elems) {
     }
 };
 
-void computeLatency(int thread_id, vector<int64_t>& latencies) {
+void computeLatency(int thread_id, vector<uint64_t>& latencies) {
     if (latencies.empty()) return;
     //cout << "Sorting latencies..." << endl;
     sort(latencies.begin(), latencies.end());
     results[thread_id] << "99th percentile latency: "
-        << latencies[99*latencies.size()/100] << " us" << endl;
+        << latencies[99*latencies.size()/100] << " us\n";
 
     if (latencies.size() % 2 == 0)
         results[thread_id] << "Median latency: " << (latencies[latencies.size()/2-1]
-                                     + latencies[latencies.size()/2])/2 << " us" << endl;
+                                     + latencies[latencies.size()/2])/2 << " us\n";
     else
-        results[thread_id] << "Median latency: " << latencies[latencies.size()/2] << " us" << endl;
+        results[thread_id] << "Median latency: " << latencies[latencies.size()/2] << " us\n";
+
+    uint64_t avg = 0;
+    for (auto n : latencies) {
+        avg += n;
+    }
+    avg /= latencies.size();
+    results[thread_id] << "Average latency: " << avg << " us\n";
 }
 
 void ThreadWork(int thread_id, const ConfigOptions& options) {
@@ -144,6 +152,7 @@ void ThreadWork(int thread_id, const ConfigOptions& options) {
         ops_per_thread = options.ops_per_thread;
     r_latencies.reserve(num_elems + num_ops);
     w_latencies.reserve(num_elems + num_ops);
+    srand (time(NULL));
 
     // start clock for measuting throughput
     auto start = std::chrono::high_resolution_clock::now();
@@ -154,11 +163,8 @@ void ThreadWork(int thread_id, const ConfigOptions& options) {
         auto write = writes[offset];
         string key, value;
 
-        if (write == 'r') {
-            key = keys[offset % num_elems];
-            value = values[offset];
-        }
-        else if (write == 'u') {
+        if (write == 'r' || write == 'u') {
+            // can also use index in updates for random reads
             key = keys[updates[offset]];
             value = values[updates[offset]];
         }
