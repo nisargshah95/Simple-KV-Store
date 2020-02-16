@@ -35,14 +35,15 @@ struct ConfigOptions {
     int percent_writes = 0;
     int value_size = 512;
     int load = 1;
+    string server_addr;
     bool Validate () {
         return ((threads >0) && (num_ops >= 0)
-             && (num_elems >= 0));
+             && (num_elems >= 0) && (!server_addr.empty()));
     }
 };
 
 void PrintUsage () {
-    cerr << "Usage: ./bench -e num_elems -n num_ops [-t threads=1] "
+    cerr << "Usage: ./bench -s <server_addr:port> -e num_elems -n num_ops [-t threads=1] "
         << "[-v val_size=512] [-w %_writes=0] [-l load_data=1]" << endl;
 }
 
@@ -146,7 +147,7 @@ void computeLatency(/*int thread_id,*/ const vector< vector<uint64_t> >& latenci
         }
         size += lat.size();
     }
-    
+    if (size == 0) return;
     avg /= size;
     // results[thread_id] << "Average latency: " << avg << " us\n";
     cout << "Average latency: " << avg << " us" << endl;
@@ -264,13 +265,16 @@ void RunBenchmark (const ConfigOptions& options) {
 
 bool GetInputArgs(int argc, char **argv, ConfigOptions& options) {
     int opt;
-    while ((opt = getopt(argc, argv, "e:n:t:v:w:l:")) != -1) {
+    while ((opt = getopt(argc, argv, "e:n:s:t:v:w:l:")) != -1) {
         switch (opt) {
             case 'e':
                 options.num_elems = atol(optarg);
                 break;
             case 'n':
                 options.num_ops = atol(optarg);
+                break;
+            case 's':
+                options.server_addr = string(optarg);
                 break;
             case 't':
                 options.threads = atoi(optarg);
@@ -325,7 +329,7 @@ int main (int argc, char **argv)
 
     client = unique_ptr<KeyValueStoreClient>(new KeyValueStoreClient(
                 grpc::CreateChannel(
-                    "localhost:50051", grpc::InsecureChannelCredentials())));
+                    options.server_addr, grpc::InsecureChannelCredentials())));
 
     RunBenchmark(options);
 

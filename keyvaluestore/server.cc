@@ -69,8 +69,8 @@ std::string get_value_from_map(const std::string& key) {
   hashtable::const_accessor a;
   bool isPresent = kv_store.find(a, key);
   if (isPresent) {
-      std::cout << "[Server] Found key: " << key
-                << ", value: " << a->second.value << std::endl;
+      // std::cout << "[Server] Found key: " << key
+      //           << ", value: " << a->second.value << std::endl;
       return a->second.value;
   }
   a.release();
@@ -79,8 +79,8 @@ std::string get_value_from_map(const std::string& key) {
 }
 
 void set_value_in_map(const std::string& key, const std::string& value) {
-    std::cout << "[Server] Setting key: " << key
-              << ", value: " << value << std::endl;
+    // std::cout << "[Server] Setting key: " << key
+    //           << ", value: " << value << std::endl;
     hashtable::accessor a;
     kv_store.insert(a, key);
     a->second = /*kv*/ {key, value};
