@@ -29,27 +29,6 @@ public:
         assert(inLog->good());
     }
 
-    /*
-     * On first run, reserve 2G space on disk for log file
-     */
-    /*
-    void checkInit(const std::string& filePath) {
-        std::ifstream f(filePath);
-        if (f.good()) return;
-
-        std::cout << "Running for the first time, initializing log..." << std::endl;
-        uint64_t max_size = 1;
-        max_size <<= 31; // 2G
-        char *max_buf = new char [max_size];
-        memset(max_buf, '\0', sizeof(char) * max_size);
-
-        std::ofstream of (filePath, std::ofstream::out | std::ofstream::binary);
-        of.write(max_buf, sizeof(char) * max_size);
-        of.flush();
-        std::cout << "Initialized log successfully" << std::endl;
-    }
-    */
-
     uint64_t write(const std::string& key, const std::string& value) {
 
         // Write key size and value size

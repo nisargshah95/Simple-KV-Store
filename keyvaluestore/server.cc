@@ -26,12 +26,7 @@
 #include <mutex>
 #include <grpcpp/grpcpp.h>
 
-#ifdef BAZEL_BUILD
-#include "examples/protos/keyvaluestore.grpc.pb.h"
-#else
 #include "keyvaluestore.grpc.pb.h"
-#endif
-
 #include "logstorage.h"
 #include "common.h"
 #include "tbb/concurrent_hash_map.h"
@@ -54,9 +49,6 @@ hrc::time_point start, stop;
 
 std::unique_ptr<LogStorage> log;
 
-// TODO: We can use a computed hash instead of string here
-// to improve lookup performance
-// typedef concurrent_hash_map<int,int> StringTable;
 typedef tbb::concurrent_hash_map<std::string, kv_pair> hashtable; 
 
 hashtable kv_store = {
@@ -89,16 +81,6 @@ void set_value_in_map(const std::string& key, const std::string& value) {
 
 // Logic and data behind the server's behavior.
 class KeyValueStoreServiceImpl final : public KeyValueStore::Service{
-  Status GetValues(ServerContext* context,
-                   ServerReaderWriter<Response, Request>* stream) override {
-    Request request;
-    while (stream->Read(&request)) {
-      Response response;
-      response.set_value(get_value_from_map(request.key()));
-      stream->Write(response);
-    }
-    return Status::OK;
-  }
 
   Status Get(ServerContext* context, const Request* request,
              Response* response) override {

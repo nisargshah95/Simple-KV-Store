@@ -55,7 +55,7 @@ ExternalProject_Add(c-ares
         -DCARES_STATIC_PIC:BOOL=ON
         -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/c-ares
   GIT_REPOSITORY https://github.com/c-ares/c-ares.git
-  GIT_TAG e982924acee7f7313b4baa4ee5ec000c5e373c30
+  GIT_TAG cares-1_15_0
 )
 
 # Builds protobuf project from the git submodule.
@@ -69,7 +69,7 @@ ExternalProject_Add(protobuf
         -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/protobuf
   SOURCE_SUBDIR cmake
   GIT_REPOSITORY https://github.com/protocolbuffers/protobuf.git
-  GIT_TAG fe1790ca0df67173702f70d5646b82f48f412b99
+  GIT_TAG v3.11.2
 )
 
 # Builds zlib project from the git submodule.
@@ -79,7 +79,7 @@ ExternalProject_Add(zlib
   CMAKE_CACHE_ARGS
         -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/zlib
   GIT_REPOSITORY https://github.com/madler/zlib.git
-  GIT_TAG cacf7f1d4e3d44d871b605da3b647f07d718623f
+  GIT_TAG v1.2.11
 )
 
 # the location where protobuf-config.cmake will be installed varies by platform

@@ -47,13 +47,6 @@ void PrintUsage () {
         << "[-v val_size=512] [-w %_writes=0] [-l load_data=1]" << endl;
 }
 
-void GenerateValue(string& value, int size) {
-    //std::string str_value;
-    //str_value.append(size, 'X');
-    //std::copy(str_value.begin(), str_value.begin()+options.value_size, value.begin());
-    value.append(size, 'X');
-}
-
 void GeneratePaddedStr(string& s, int i, int padding) {
     string i_str = to_string(i);
     s.append(padding-i_str.size(), '0');
@@ -232,7 +225,6 @@ void RunBenchmark (const ConfigOptions& options) {
     PopulateKeysAndValuesAndOps(options);
 
     // initialize kv store
-    //GenerateValue(value, options.value_size);
     if (options.load) {
         for (int i = 0; i < options.num_elems; i++) {
             // cout << "Inserting " << i << endl;

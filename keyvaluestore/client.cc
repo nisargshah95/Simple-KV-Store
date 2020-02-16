@@ -5,8 +5,6 @@ int main(int argc, char** argv) {
   // are created. This channel models a connection to an endpoint (in this case,
   // localhost at port 50051). We indicate that the channel isn't authenticated
   // (use of InsecureChannelCredentials()).
-  // In this example, we are using a cache which has been added in as an
-  // interceptor.
 
   if (argc != 2) {
       std::cerr << "Usage: ./client <server addr>\n";
