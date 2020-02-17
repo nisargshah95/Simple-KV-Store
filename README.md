@@ -44,7 +44,7 @@ sudo apt-get update && sudo apt-get install libtbb-dev
 
 #### Build KV store along with its dependencies (gRPC, etc.)
 ```
-cd cmake/build && cmake ../.. && make`
+cd cmake/build && cmake ../.. && make -j$(cat /proc/cpuinfo | grep -c proc)
 ```
 
 ## Execute server/client
@@ -69,7 +69,7 @@ For example, path to log file can be set to /tmp/log.txt
 -l: Set to 0 if not loading num_elems before executing ops
 ```
 
-Example: Load 1M KV pairs with 4kb values into the store
+* Example: Load 1M KV pairs with 4kb values into the store
 ```
 $ ./kvclient -s localhost:50051 -e 1000000 -n 0 -v 4096
 Configuration of current run:
@@ -80,7 +80,7 @@ Number of threads:1
 Value Size:512
 ```
 
-Read-only workload with 1M ops on a store with 100k values
+* Read-only workload with 1M ops on a store with 100k values
 ```
 $ ./kvclient -s localhost:50051 -e 100000 -n 1000000 -l 0
 Configuration of current run:
@@ -96,7 +96,7 @@ Throughput:
 Average throughput: 4511.96 ops/s
 ```
 
-50% write workload (value size 1024 bytes) with 1M ops on store with 100k keys
+* 50% write workload (value size 1024 bytes) with 1M ops on store with 100k keys
 ```
 ./kvclient -s localhost:50051 -e 100000 -n 1000000 -l 0 -w 50 -v 1024
 Configuration of current run:
