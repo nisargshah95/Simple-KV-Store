@@ -15,7 +15,7 @@ using namespace std;
 
 
 unique_ptr<KeyValueStoreClient> client;
-ofstream results ("results.txt");
+//ofstream results ("results.txt");
 
 string *keys;
 string *values;
@@ -107,6 +107,9 @@ void bench(char write, string key, const string& value, int num_elems) {
         if (resp.empty()) {
             cerr << "Error reading key: " << key << endl;
         }
+	//Uncomment the following for verification
+	//if(resp.compare(value) != 0)
+	//	cerr << "Get value is incorrect\n";
         // assert((const valueType)(values[0]) == value);
     } else {
         // We want to insert new keys.
@@ -324,6 +327,7 @@ int main (int argc, char **argv)
                 grpc::CreateChannel(
                     options.server_addr, grpc::InsecureChannelCredentials())));
     RunBenchmark(options);
-
+    cout << "Total gets done: " << options.num_ops*(1 - (options.percent_writes*1.0)/100.0) <<"\n";
+    cout << "Total sets done: " << options.num_ops*(options.percent_writes*1.0/100.0) <<"\n"; 
     return 0;
 }
