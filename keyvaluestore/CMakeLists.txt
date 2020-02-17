@@ -108,7 +108,7 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR})
 find_package(TBB)
 
 # Targets greeter_[async_](client|server)
-foreach(_target client server bench)
+foreach(_target kvclient kvserver sample_client)
   add_executable(${_target} "${_target}.cc"
     ${hw_proto_srcs}
     ${hw_grpc_srcs})
