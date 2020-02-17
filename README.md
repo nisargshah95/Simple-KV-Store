@@ -49,6 +49,12 @@ cd cmake/build && cmake ../.. && make -j$(cat /proc/cpuinfo | grep -c proc)
 
 ## Execute server/client
 
+### Run test script
+The script starts 10 clients that perform 10k writes and reads. Run the following script from repo -
+```
+bash test_script.sh
+```
+
 ### Run server
 ```
 cd <repo>/cmake/build/keyvaluestore
