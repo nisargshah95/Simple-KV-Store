@@ -82,7 +82,7 @@ class KeyValueStoreClient {
     }
   }
 
-  void GetPrefix(const std::string& prefixKey) {
+  std::vector<std::string> GetPrefix(const std::string& prefixKey) {
     // Context for the client. It could be used to convey extra information to
     // the server and/or tweak certain RPC behaviors.
     ClientContext context;
@@ -91,8 +91,11 @@ class KeyValueStoreClient {
     std::unique_ptr<ClientReader<Response> > reader(
     	stub_->GetPrefix(&context, request));
     Response response;
+
+    std::vector<std::string> values;
     while (reader->Read(&response)) {
-  	std::cout << response.value() <<"\n";
+      	//std::cout << response.value() <<"\n";
+        values.push_back(response.value());
     }
     Status status = reader->Finish();
     if (status.ok()) {
@@ -102,6 +105,8 @@ class KeyValueStoreClient {
                 << std::endl;
       std::cout << "RPC failed" << std::endl;
     }
+
+    return values;
   }
  
 

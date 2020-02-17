@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cassert>
+#include <cstdio>
 #include <experimental/filesystem>
 #include <fstream>
 #include <memory>
@@ -9,15 +10,16 @@
 #include "common.h"
 #include "tbb/concurrent_hash_map.h"
 
-class LogStorage/*: public Persistence*/ {
+class LogStorage {
 private:
+    // output stream for append-only log
     std::shared_ptr<std::ofstream> outLog;
+    // input stream to read all contents of log at once on startup
     std::shared_ptr<std::ifstream> inLog;
     std::experimental::filesystem::path logPath;
 
 public:
     LogStorage(const std::string& filePath) {
-        //checkInit(filePath);
 
         logPath = filePath;
         outLog = std::shared_ptr<std::ofstream>(new std::ofstream (
@@ -73,7 +75,7 @@ public:
         uint64_t consistentOffset = 0;
         bool corruptBytes = false;
 
-        while (!inLog->eof()) {
+        while (inLog->peek() != EOF) {
 
             // Read key and value size
             size_t keySize = 0;

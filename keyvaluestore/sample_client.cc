@@ -7,7 +7,7 @@ int main(int argc, char** argv) {
   // (use of InsecureChannelCredentials()).
 
   if (argc != 2) {
-      std::cerr << "Usage: ./client <server addr>\n";
+      std::cerr << "Usage: ./sample_client <server addr>\n";
       return 1;
   }
 

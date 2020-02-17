@@ -43,7 +43,7 @@ struct ConfigOptions {
 };
 
 void PrintUsage () {
-    cerr << "Usage: ./bench -s <server_addr:port> -e num_elems -n num_ops [-t threads=1] "
+    cerr << "Usage: ./kvclient -s server_addr:port -e num_elems -n num_ops [-t threads=1] "
         << "[-v val_size=512] [-w %_writes=0] [-l load_data=1]" << endl;
 }
 
@@ -111,7 +111,7 @@ void bench(char write, string key, const string& value, int num_elems) {
     } else {
         // We want to insert new keys.
         // [0..num_elems] already in the map
-        // cout << "Inserting " << options.num_elems+key << endl;
+        // cout << "Inserting " << key << endl;
         if (!client->Set(key, value)) {
             cerr << "Client set failed for key: " << key << endl;
         }
@@ -227,13 +227,14 @@ void RunBenchmark (const ConfigOptions& options) {
     // initialize kv store
     if (options.load) {
         for (int i = 0; i < options.num_elems; i++) {
-            // cout << "Inserting " << i << endl;
+            cout << "Inserting " << keys[i] << endl;
             // string value_str (value.begin(), value.end());
             if(!client->Set(keys[i], values[i])) {
                 cerr << "Client set failed for key: " << keys[i] << endl;
             }
         }
     }
+    cout << "done init\n";
 
     // Don't run benchmark if we're only loading data
     if (options.num_ops == 0) return;
@@ -311,18 +312,17 @@ int main (int argc, char **argv)
         cerr << "Exiting!" << endl;
         return 1;
     }
-    PrintInputArgs(options);
 
     if (!options.Validate()) {
         PrintUsage();
         cerr << "Exiting!" << endl;
         return 1;
     }
+    PrintInputArgs(options);
 
     client = unique_ptr<KeyValueStoreClient>(new KeyValueStoreClient(
                 grpc::CreateChannel(
                     options.server_addr, grpc::InsecureChannelCredentials())));
-
     RunBenchmark(options);
 
     return 0;

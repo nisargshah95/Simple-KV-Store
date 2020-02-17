@@ -51,9 +51,7 @@ std::unique_ptr<LogStorage> log;
 
 typedef tbb::concurrent_hash_map<std::string, kv_pair> hashtable; 
 
-hashtable kv_store = {
-    {}
-};
+hashtable kv_store;
 
 std::mutex mtx;
 
@@ -71,8 +69,6 @@ std::string get_value_from_map(const std::string& key) {
 }
 
 void set_value_in_map(const std::string& key, const std::string& value) {
-    // std::cout << "[Server] Setting key: " << key
-    //           << ", value: " << value << std::endl;
     hashtable::accessor a;
     kv_store.insert(a, key);
     a->second = /*kv*/ {key, value};
@@ -92,10 +88,13 @@ class KeyValueStoreServiceImpl final : public KeyValueStore::Service{
 
   Status Set(ServerContext* context, const KVPair* kvPair,
              Empty* response) override {
+    //std::cout << "[Server] Setting key: " << kvPair->key()
+    //          << ", value: " << kvPair->value() << std::endl;
     mtx.lock();
     // std::cout << "[Server] Set" << std::endl;
 
     if (log->write(kvPair->key() , kvPair->value()) == -1) {
+        std::cerr << "Set for key: " << kvPair->key() << " failed" << std::endl;
         return Status::CANCELLED;
     }
     // Flush explicitly to ensure persistence
@@ -120,7 +119,7 @@ class KeyValueStoreServiceImpl final : public KeyValueStore::Service{
 
 };
 
-void RunServer() {
+void RunServer(const std::string& logFile) {
   std::string server_address("0.0.0.0:50051");
   KeyValueStoreServiceImpl service;
 
@@ -133,7 +132,7 @@ void RunServer() {
 
   // Initialize Log and in-memory cache
   // Do this before assembling server
-  log = std::unique_ptr<LogStorage>(new LogStorage("/tmp/log.txt"));
+  log = std::unique_ptr<LogStorage>(new LogStorage(logFile));
   log->readAll(kv_store);
 
   // Finally assemble the server.
@@ -150,8 +149,12 @@ void RunServer() {
 }
 
 int main(int argc, char** argv) {
+  if (argc != 2) {
+    std::cerr << "Usage: ./kvserver <path to log file>\n";
+    return 1;
+  }
   start = hrc::now();
-  RunServer();
+  RunServer(std::string(argv[1]));
 
   return 0;
 }
