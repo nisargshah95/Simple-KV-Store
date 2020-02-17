@@ -227,14 +227,14 @@ void RunBenchmark (const ConfigOptions& options) {
     // initialize kv store
     if (options.load) {
         for (int i = 0; i < options.num_elems; i++) {
-            cout << "Inserting " << keys[i] << endl;
+            // cout << "Inserting " << keys[i] << endl;
             // string value_str (value.begin(), value.end());
             if(!client->Set(keys[i], values[i])) {
                 cerr << "Client set failed for key: " << keys[i] << endl;
             }
         }
     }
-    cout << "done init\n";
+    // cout << "done init\n";
 
     // Don't run benchmark if we're only loading data
     if (options.num_ops == 0) return;
