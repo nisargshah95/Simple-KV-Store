@@ -29,7 +29,7 @@ Verify cmake version
 cmake --version
 ```
 
-#### Install gcc (>= 7)
+#### Install gcc 7
 ```
 sudo apt-get install -y software-properties-common
 sudo add-apt-repository ppa:ubuntu-toolchain-r/test
